@@ -32,7 +32,7 @@ namespace {
 
 // Default parameters.
 constexpr int kDefaultPlayers = 2;
-constexpr double kAnte = 1;
+constexpr int kDefaultAnte = 1;
 
 // Facts about the game
 const GameType kGameType{/*short_name=*/"kuhn_poker",
@@ -49,7 +49,8 @@ const GameType kGameType{/*short_name=*/"kuhn_poker",
                          /*provides_observation_string=*/true,
                          /*provides_observation_tensor=*/true,
                          /*parameter_specification=*/
-                         {{"players", GameParameter(kDefaultPlayers)}},
+                         {{"players", GameParameter(kDefaultPlayers)},
+                          {"ante_amount", GameParameter(kDefaultAnte)}},
                          /*default_loadable=*/true,
                          /*provides_factored_observation_string=*/true,
                         };
@@ -169,14 +170,15 @@ class KuhnObserver : public Observer {
   IIGObservationType iig_obs_type_;
 };
 
-KuhnState::KuhnState(std::shared_ptr<const Game> game)
+KuhnState::KuhnState(std::shared_ptr<const Game> game, int ante_amount)
     : State(game),
       first_bettor_(kInvalidPlayer),
       card_dealt_(game->NumPlayers() + 1, kInvalidPlayer),
       winner_(kInvalidPlayer),
-      pot_(kAnte * game->NumPlayers()),
+      pot_(ante_amount * game->NumPlayers()),
+      ante_amount_(ante_amount),
       // How much each player has contributed to the pot, indexed by pid.
-      ante_(game->NumPlayers(), kAnte) {}
+      ante_(game->NumPlayers(), ante_amount) {}
 
 int KuhnState::CurrentPlayer() const {
   if (IsTerminal()) {
@@ -196,7 +198,7 @@ void KuhnState::DoApplyAction(Action move) {
   } else if (move == ActionType::kBet) {
     if (first_bettor_ == kInvalidPlayer) first_bettor_ = CurrentPlayer();
     pot_ += 1;
-    ante_[CurrentPlayer()] += kAnte;
+    ante_[CurrentPlayer()] += ante_amount_;
   }
 
   // We undo that before exiting the method.
@@ -276,7 +278,7 @@ std::vector<double> KuhnState::Returns() const {
 
   std::vector<double> returns(num_players_);
   for (auto player = Player{0}; player < num_players_; ++player) {
-    const int bet = DidBet(player) ? 2 : 1;
+    const int bet = DidBet(player) ? 1 + ante_amount_ : ante_amount_;
     returns[player] = (player == winner_) ? (pot_ - bet) : -bet;
   }
   return returns;
@@ -373,7 +375,8 @@ std::unique_ptr<State> KuhnState::ResampleFromInfostate(
 }
 
 KuhnGame::KuhnGame(const GameParameters& params)
-    : Game(kGameType, params), num_players_(ParameterValue<int>("players")) {
+    : Game(kGameType, params), num_players_(ParameterValue<int>("players")),
+      ante_amount_(ParameterValue<int>("ante_amount")) {
   SPIEL_CHECK_GE(num_players_, kGameType.min_num_players);
   SPIEL_CHECK_LE(num_players_, kGameType.max_num_players);
   default_observer_ = std::make_shared<KuhnObserver>(kDefaultObsType);
@@ -389,7 +392,7 @@ KuhnGame::KuhnGame(const GameParameters& params)
 }
 
 std::unique_ptr<State> KuhnGame::NewInitialState() const {
-  return std::unique_ptr<State>(new KuhnState(shared_from_this()));
+  return std::unique_ptr<State>(new KuhnState(shared_from_this(), ante_amount_));
 }
 
 std::vector<int> KuhnGame::InformationStateTensorShape() const {
@@ -414,7 +417,7 @@ double KuhnGame::MaxUtility() const {
   // of the game minus then money the player had before starting the game.
   // Everyone puts a chip in at the start, and then they each have one more
   // chip. Most that a player can gain is (#opponents)*2.
-  return (num_players_ - 1) * 2;
+  return (num_players_ * ante_amount_ - 1) * 2;
 }
 
 double KuhnGame::MinUtility() const {
@@ -422,7 +425,7 @@ double KuhnGame::MinUtility() const {
   // of the game minus then money the player had before starting the game.
   // In Kuhn, the most any one player can lose is the single chip they paid
   // to play and the single chip they paid to raise/call.
-  return -2;
+  return -(1 + ante_amount_);
 }
 
 std::shared_ptr<Observer> KuhnGame::MakeObserver(

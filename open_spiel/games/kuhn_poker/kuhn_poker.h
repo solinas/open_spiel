@@ -49,7 +49,7 @@ class KuhnObserver;
 
 class KuhnState : public State {
  public:
-  explicit KuhnState(std::shared_ptr<const Game> game);
+  explicit KuhnState(std::shared_ptr<const Game> game, int ante_amount);
   KuhnState(const KuhnState&) = default;
 
   Player CurrentPlayer() const override;
@@ -95,6 +95,7 @@ class KuhnState : public State {
   int pot_;                      // the size of the pot
   // How much each player has contributed to the pot, indexed by pid.
   std::vector<int> ante_;
+  int ante_amount_;
 };
 
 class KuhnGame : public Game {
@@ -123,7 +124,8 @@ class KuhnGame : public Game {
 
  private:
   // Number of players.
-  int num_players_;
+  int num_players_;\
+  int ante_amount_;
 };
 
 // Returns policy that always passes.

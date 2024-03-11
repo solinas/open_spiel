@@ -18,12 +18,14 @@
 #include "open_spiel/abseil-cpp/absl/flags/flag.h"
 #include "open_spiel/abseil-cpp/absl/flags/parse.h"
 #include "open_spiel/algorithms/cfr.h"
+#include "open_spiel/algorithms/corr_dist.h"
+#include "open_spiel/algorithms/corr_dev_builder.h"
 #include "open_spiel/algorithms/tabular_exploitability.h"
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 
-ABSL_FLAG(int, num_iters, 10000, "How many iters to run for.");
-ABSL_FLAG(int, report_every, 200, "How often to report exploitability.");
+ABSL_FLAG(int, num_iters, 1000, "How many iters to run for.");
+ABSL_FLAG(int, report_every, 50, "How often to report CCE dist.");
 ABSL_FLAG(int, num_players, 3, "The number of players in the game.");
 ABSL_FLAG(int, ante_amount, 1, "How many chips each player initially contributes tot the pot.");
 ABSL_FLAG(bool, alternating, false, "Use CFR with alternating updates");
@@ -33,14 +35,25 @@ void run(std::shared_ptr<const open_spiel::Game> game, int ante) {
   open_spiel::algorithms::CFRSolverBase solver(*game,
       /*alternating_updates*/absl::GetFlag(FLAGS_alternating),
       /*linear_averaging*/false, /*regret_matching_plus*/false);
-  for (int i = 0; i < absl::GetFlag(FLAGS_num_iters); ++i) {
+  open_spiel::algorithms::CorrDevBuilder cd_builder;
+  open_spiel::algorithms::CorrDistConfig config;
+  std::vector<open_spiel::TabularPolicy> policies;
+  int num_iterations = absl::GetFlag(FLAGS_num_iters);
+  policies.reserve(num_iterations);
+  for (int i = 0; i < num_iterations; ++i) {
     solver.EvaluateAndUpdatePolicy();
+    open_spiel::TabularPolicy current_policy =
+    static_cast<open_spiel::algorithms::CFRCurrentPolicy*>(solver.CurrentPolicy().get())
+        ->AsTabular();
+    policies.push_back(current_policy);
+    cd_builder.AddSampledJointPolicy(current_policy, 100);
     if (i % absl::GetFlag(FLAGS_report_every) == 0 ||
         i == absl::GetFlag(FLAGS_num_iters) - 1) {
-      double nash_conv = open_spiel::algorithms::NashConv(
-          *game, *solver.AveragePolicy());
-      std::cerr << "Iteration " << i << " NashConv=" << nash_conv
-                << std::endl;
+      double nash_conv = open_spiel::algorithms::NashConv(*game, *solver.AveragePolicy());
+      open_spiel::algorithms::CorrelationDevice mu = open_spiel::algorithms::UniformCorrelationDevice(policies);
+      open_spiel::algorithms::CorrDistInfo cce_dist_info = open_spiel::algorithms::CCEDist(*game, mu);
+      std::cerr << "Iteration " << i << " CCE dist=" << cce_dist_info.dist_value
+                << " NashConv=" << nash_conv << std::endl;
     }
   }
 }
@@ -49,7 +62,8 @@ int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   std::stringstream ss;
   int ante = absl::GetFlag(FLAGS_ante_amount);
-  ss << "leduc_poker(players=3,ante_amount=" << ante << ")";
+  int num_players = absl::GetFlag(FLAGS_num_players);
+  ss << "kuhn_poker(players=" << num_players << ",ante_amount=" << ante << ")";
   std::shared_ptr<const open_spiel::Game> game = open_spiel::LoadGame(ss.str());
   run(game, ante);
 }
