@@ -54,6 +54,7 @@ namespace leduc_poker {
 
 inline constexpr int kInvalidCard = -10000;
 inline constexpr int kDefaultPlayers = 2;
+inline constexpr int kDefaultAnte = 1;
 inline constexpr int kNumSuits = 2;
 inline constexpr int kFirstRaiseAmount = 2;
 inline constexpr int kSecondRaiseAmount = 4;
@@ -74,7 +75,7 @@ class LeducState : public State {
  public:
   explicit LeducState(std::shared_ptr<const Game> game,
                       bool action_mapping, bool suit_isomorphism,
-                      double tie_bonus_multiplier);
+                      int ante_amount, double tie_bonus_multiplier);
 
   Player CurrentPlayer() const override;
   std::string ActionToString(Player player, Action move) const override;
@@ -178,6 +179,7 @@ class LeducState : public State {
   int private_cards_dealt_;  // How many private cards currently dealt.
   int remaining_players_;    // Num. players still in (not folded).
   double tie_bonus_multiplier_;
+  int ante_amount_;
 
   // Is this player a winner? Indexed by pid.
   std::vector<bool> winner_;
@@ -251,6 +253,7 @@ class LeducGame : public Game {
   // rank.
   bool suit_isomorphism_;
   double tie_bonus_multiplier_;
+  int ante_amount_;
 };
 
 // Returns policy that always folds.

@@ -35,8 +35,6 @@ namespace open_spiel {
 namespace leduc_poker {
 namespace {
 
-constexpr double kAnte = 1;
-
 const GameType kGameType{/*short_name=*/"leduc_poker",
                          /*long_name=*/"Leduc Poker",
                          GameType::Dynamics::kSequential,
@@ -54,7 +52,8 @@ const GameType kGameType{/*short_name=*/"leduc_poker",
                          {{"players", GameParameter(kDefaultPlayers)},
                           {"action_mapping", GameParameter(false)},
                           {"suit_isomorphism", GameParameter(false)},
-                          {"tie_bonus_multiplier", GameParameter(kDefaultTieBonusMultiplier)}}};
+                          {"tie_bonus_multiplier", GameParameter(kDefaultTieBonusMultiplier)},
+                          {"ante_amount", GameParameter(kDefaultAnte)}}};
 
 std::shared_ptr<const Game> Factory(const GameParameters& params) {
   return std::shared_ptr<const Game>(new LeducGame(params));
@@ -241,15 +240,15 @@ class LeducObserver : public Observer {
 };
 
 LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
-                       bool suit_isomorphism, double tie_bonus_multiplier)
+                       bool suit_isomorphism, int ante_amount, double tie_bonus_multiplier)
     : State(game),
       cur_player_(kChancePlayerId),
       num_calls_(0),
       num_raises_(0),
       round_(1),   // Round number (1 or 2).
-      stakes_(1),  // The current 'level' of the bet.
+      stakes_(ante_amount),  // The current 'level' of the bet.
       num_winners_(-1),
-      pot_(kAnte * game->NumPlayers()),  // Number of chips in the pot.
+      pot_(ante_amount * game->NumPlayers()),  // Number of chips in the pot.
       public_card_(kInvalidCard),
       // Number of cards remaining; not equal deck_.size()!
       deck_size_((game->NumPlayers() + 1) * kNumSuits),
@@ -260,9 +259,9 @@ LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
       // Each player's single private card. Indexed by pid.
       private_cards_(game->NumPlayers(), kInvalidCard),
       // How much money each player has, indexed by pid.
-      money_(game->NumPlayers(), kStartingMoney - kAnte),
+      money_(game->NumPlayers(), kStartingMoney - ante_amount),
       // How much each player has contributed to the pot, indexed by pid.
-      ante_(game->NumPlayers(), kAnte),
+      ante_(game->NumPlayers(), ante_amount),
       // Flag for whether the player has folded, indexed by pid.
       folded_(game->NumPlayers(), false),
       // Sequence of actions for each round. Needed to report information
@@ -275,7 +274,8 @@ LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
       // Players cannot distinguish between cards of different suits with the
       // same rank.
       suit_isomorphism_(suit_isomorphism),
-      tie_bonus_multiplier_(tie_bonus_multiplier) {
+      tie_bonus_multiplier_(tie_bonus_multiplier),
+      ante_amount_(ante_amount) {
   // Cards by value (0-6 for standard 2-player game, kInvalidCard if no longer
   // in the deck.)
   deck_.resize(deck_size_);
@@ -500,9 +500,8 @@ std::vector<double> LeducState::Returns() const {
   std::vector<double> returns(num_players_);
   for (auto player = Player{0}; player < num_players_; ++player) {
     // Money vs money at start.
-    returns[player] = money_[player] - kStartingMoney;
+    returns[player] = (money_[player] - kStartingMoney) / ante_amount_;
   }
-
   return returns;
 }
 
@@ -783,7 +782,8 @@ LeducGame::LeducGame(const GameParameters& params)
       total_cards_((num_players_ + 1) * kNumSuits),
       action_mapping_(ParameterValue<bool>("action_mapping")),
       suit_isomorphism_(ParameterValue<bool>("suit_isomorphism")),
-      tie_bonus_multiplier_(ParameterValue<double>("tie_bonus_multiplier")) {
+      tie_bonus_multiplier_(ParameterValue<double>("tie_bonus_multiplier")),
+      ante_amount_(ParameterValue<int>("ante_amount")) {
   SPIEL_CHECK_GE(num_players_, kGameType.min_num_players);
   SPIEL_CHECK_LE(num_players_, kGameType.max_num_players);
   default_observer_ = std::make_shared<LeducObserver>(kDefaultObsType);
@@ -794,7 +794,8 @@ std::unique_ptr<State> LeducGame::NewInitialState() const {
   return absl::make_unique<LeducState>(shared_from_this(),
                                        /*action_mapping=*/action_mapping_,
                                        /*suit_isomorphism=*/suit_isomorphism_,
-                                       /*tie_bonus_multiplier=*/tie_bonus_multiplier_);
+                                       /*tie_bonus_multiplier=*/tie_bonus_multiplier_,
+                                       /*ante_amount=*/ante_amount_);
 }
 
 int LeducGame::MaxChanceOutcomes() const {
@@ -832,9 +833,10 @@ double LeducGame::MaxUtility() const {
   // the game minus then money the player had before starting the game.
   // The most a player can win *per opponent* is the most each player can put
   // into the pot, which is the raise amounts on each round times the maximum
-  // number raises, plus the original chip they put in to play.
+  // number raises, plus the original chips they put in to play.
   return (num_players_ - 1) * (kTotalRaisesPerRound * kFirstRaiseAmount +
-                               kTotalRaisesPerRound * kSecondRaiseAmount + 1);
+                               kTotalRaisesPerRound * kSecondRaiseAmount + 
+                               ante_amount_);
 }
 
 double LeducGame::MinUtility() const {
@@ -844,7 +846,7 @@ double LeducGame::MinUtility() const {
   // round times the amounts of each of the raises, plus the original chip
   // they put in to play.
   return -1 * (kTotalRaisesPerRound * kFirstRaiseAmount +
-               kTotalRaisesPerRound * kSecondRaiseAmount + 1);
+               kTotalRaisesPerRound * kSecondRaiseAmount + ante_amount_);
 }
 
 std::shared_ptr<Observer> LeducGame::MakeObserver(
