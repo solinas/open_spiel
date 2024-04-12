@@ -60,6 +60,7 @@ inline constexpr int kSecondRaiseAmount = 4;
 inline constexpr int kTotalRaisesPerRound = 2;
 inline constexpr int kMaxRaises = 2;
 inline constexpr int kStartingMoney = 100;
+inline constexpr double kDefaultTieBonusMultiplier = 1.0;
 
 // Number of info states in the 2P game with default params.
 inline constexpr int kNumInfoStates = 936;
@@ -72,7 +73,8 @@ enum ActionType { kFold = 0, kCall = 1, kRaise = 2 };
 class LeducState : public State {
  public:
   explicit LeducState(std::shared_ptr<const Game> game,
-                      bool action_mapping, bool suit_isomorphism);
+                      bool action_mapping, bool suit_isomorphism,
+                      double tie_bonus_multiplier);
 
   Player CurrentPlayer() const override;
   std::string ActionToString(Player player, Action move) const override;
@@ -175,6 +177,7 @@ class LeducState : public State {
   int deck_size_;    // Number of cards remaining; not equal deck_.size()
   int private_cards_dealt_;  // How many private cards currently dealt.
   int remaining_players_;    // Num. players still in (not folded).
+  double tie_bonus_multiplier_;
 
   // Is this player a winner? Indexed by pid.
   std::vector<bool> winner_;
@@ -247,6 +250,7 @@ class LeducGame : public Game {
   // Players cannot distinguish between cards of different suits with the same
   // rank.
   bool suit_isomorphism_;
+  double tie_bonus_multiplier_;
 };
 
 // Returns policy that always folds.

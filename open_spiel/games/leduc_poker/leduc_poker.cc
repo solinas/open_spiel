@@ -53,7 +53,8 @@ const GameType kGameType{/*short_name=*/"leduc_poker",
                          /*parameter_specification=*/
                          {{"players", GameParameter(kDefaultPlayers)},
                           {"action_mapping", GameParameter(false)},
-                          {"suit_isomorphism", GameParameter(false)}}};
+                          {"suit_isomorphism", GameParameter(false)},
+                          {"tie_bonus_multiplier", GameParameter(kDefaultTieBonusMultiplier)}}};
 
 std::shared_ptr<const Game> Factory(const GameParameters& params) {
   return std::shared_ptr<const Game>(new LeducGame(params));
@@ -240,7 +241,7 @@ class LeducObserver : public Observer {
 };
 
 LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
-                       bool suit_isomorphism)
+                       bool suit_isomorphism, double tie_bonus_multiplier)
     : State(game),
       cur_player_(kChancePlayerId),
       num_calls_(0),
@@ -273,7 +274,8 @@ LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
       action_mapping_(action_mapping),
       // Players cannot distinguish between cards of different suits with the
       // same rank.
-      suit_isomorphism_(suit_isomorphism) {
+      suit_isomorphism_(suit_isomorphism),
+      tie_bonus_multiplier_(tie_bonus_multiplier) {
   // Cards by value (0-6 for standard 2-player game, kInvalidCard if no longer
   // in the deck.)
   deck_.resize(deck_size_);
@@ -664,6 +666,9 @@ void LeducState::ResolveWinner() {
       if (winner_[player_index]) {
         // Give this player their share.
         money_[player_index] += static_cast<double>(pot_) / num_winners_;
+        if (num_winners_ > 1) {
+          money_[player_index] *= tie_bonus_multiplier_;
+        }
       }
     }
     pot_ = 0;
@@ -777,7 +782,8 @@ LeducGame::LeducGame(const GameParameters& params)
       num_players_(ParameterValue<int>("players")),
       total_cards_((num_players_ + 1) * kNumSuits),
       action_mapping_(ParameterValue<bool>("action_mapping")),
-      suit_isomorphism_(ParameterValue<bool>("suit_isomorphism")) {
+      suit_isomorphism_(ParameterValue<bool>("suit_isomorphism")),
+      tie_bonus_multiplier_(ParameterValue<double>("tie_bonus_multiplier")) {
   SPIEL_CHECK_GE(num_players_, kGameType.min_num_players);
   SPIEL_CHECK_LE(num_players_, kGameType.max_num_players);
   default_observer_ = std::make_shared<LeducObserver>(kDefaultObsType);
@@ -787,7 +793,8 @@ LeducGame::LeducGame(const GameParameters& params)
 std::unique_ptr<State> LeducGame::NewInitialState() const {
   return absl::make_unique<LeducState>(shared_from_this(),
                                        /*action_mapping=*/action_mapping_,
-                                       /*suit_isomorphism=*/suit_isomorphism_);
+                                       /*suit_isomorphism=*/suit_isomorphism_,
+                                       /*tie_bonus_multiplier=*/tie_bonus_multiplier_);
 }
 
 int LeducGame::MaxChanceOutcomes() const {

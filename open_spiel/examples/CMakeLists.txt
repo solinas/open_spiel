@@ -6,8 +6,6 @@ add_test(cfr_example_test cfr_example)
 
 add_executable(cfr_cce_example cfr_cce_example.cc ${OPEN_SPIEL_OBJECTS})
 
-add_executable(external_sampling_cfr_example external_sampling_cfr_example.cc ${OPEN_SPIEL_OBJECTS})
-
 add_executable(cfr_multi_equilibria_example cfr_multi_equilibria_example.cc
                ${OPEN_SPIEL_OBJECTS})
 
