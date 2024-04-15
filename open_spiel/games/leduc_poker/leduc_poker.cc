@@ -240,7 +240,7 @@ class LeducObserver : public Observer {
 };
 
 LeducState::LeducState(std::shared_ptr<const Game> game, bool action_mapping,
-                       bool suit_isomorphism, int ante_amount, double tie_bonus_multiplier)
+                       bool suit_isomorphism, double tie_bonus_multiplier, int ante_amount)
     : State(game),
       cur_player_(kChancePlayerId),
       num_calls_(0),

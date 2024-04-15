@@ -23,7 +23,7 @@
 #include "open_spiel/spiel_utils.h"
 
 ABSL_FLAG(int, num_iters, 10000, "How many iters to run for.");
-ABSL_FLAG(int, report_every, 200, "How often to report exploitability.");
+ABSL_FLAG(int, report_every, 2000, "How often to report exploitability.");
 ABSL_FLAG(int, num_players, 2, "The number of players in the game.");
 ABSL_FLAG(int, ante_amount, 1, "How many chips each player initially contributes tot the pot.");
 ABSL_FLAG(double, tie_bonus, 1.0, "Bonus factor given to ties");

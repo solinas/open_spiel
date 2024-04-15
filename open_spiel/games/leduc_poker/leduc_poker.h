@@ -75,7 +75,7 @@ class LeducState : public State {
  public:
   explicit LeducState(std::shared_ptr<const Game> game,
                       bool action_mapping, bool suit_isomorphism,
-                      int ante_amount, double tie_bonus_multiplier);
+                      double tie_bonus_multiplier, int ante_amount);
 
   Player CurrentPlayer() const override;
   std::string ActionToString(Player player, Action move) const override;
