@@ -664,10 +664,11 @@ void LeducState::ResolveWinner() {
     for (Player player_index = 0; player_index < num_players_; player_index++) {
       if (winner_[player_index]) {
         // Give this player their share.
-        money_[player_index] += static_cast<double>(pot_) / num_winners_;
+        double winnings = static_cast<double>(pot_) / num_winners_;
         if (num_winners_ > 1) {
-          money_[player_index] *= tie_bonus_multiplier_;
+          winnings *= tie_bonus_multiplier_;
         }
+        money_[player_index] += winnings;
       }
     }
     pot_ = 0;

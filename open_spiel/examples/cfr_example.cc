@@ -22,7 +22,7 @@
 #include "open_spiel/spiel.h"
 #include "open_spiel/spiel_utils.h"
 
-ABSL_FLAG(int, num_iters, 10000, "How many iters to run for.");
+ABSL_FLAG(int, num_iters, 100000, "How many iters to run for.");
 ABSL_FLAG(int, report_every, 2000, "How often to report exploitability.");
 ABSL_FLAG(int, num_players, 2, "The number of players in the game.");
 ABSL_FLAG(int, ante_amount, 1, "How many chips each player initially contributes tot the pot.");
@@ -34,7 +34,7 @@ void run(std::shared_ptr<const open_spiel::Game> game, int num_players, int ante
   std::cerr << "ANTE: " << ante << std::endl;
   std::cerr << "TIE_BONUS: " << tie_bonus << std::endl;
   open_spiel::algorithms::CFRSolverBase solver(*game,
-      /*alternating_updates*/absl::GetFlag(FLAGS_alternating),
+      absl::GetFlag(FLAGS_alternating),
       /*linear_averaging*/false, /*regret_matching_plus*/false);
   for (int i = 0; i < absl::GetFlag(FLAGS_num_iters); ++i) {
     solver.EvaluateAndUpdatePolicy();
